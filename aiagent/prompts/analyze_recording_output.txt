@@ -1,0 +1,109 @@
+{{
+  "prospect_summary": {{
+    "short_summary": "",
+    "key_points": []
+  }},
+  "interest": {{
+    "score_0_to_10": 0,
+    "trend_over_call": "increasing | decreasing | stable | mixed",
+    "signals": [
+      {{
+        "type": "positive | negative | neutral",
+        "quote": "",
+        "speaker": "",
+        "time_start": 0.0,
+        "time_end": 0.0,
+        "explanation": ""
+      }}
+    ]
+  }},
+  "prospect_persona": {{
+    "label": "",
+    "description": "",
+    "communication_style": "concise | verbose | analytical | emotional | process_oriented | relationship_oriented | other",
+    "decision_style": "independent | committee_based | platform_restricted | opportunistic | unknown"
+  }},
+  "investment_profile": {{
+    "investment_style": "model_based | stock_picker | etf_focused | fund_focused | unknown",
+    "domain_interest_tags": [
+      "value",
+      "growth",
+      "income",
+      "etfs",
+      "individual_equities",
+      "alternatives",
+      "platform_approved_only",
+      "other"
+    ],
+    "explicit_preferences": [
+      {{
+        "quote": "",
+        "speaker": "",
+        "time_start": 0.0,
+        "time_end": 0.0,
+        "interpretation": ""
+      }}
+    ]
+  }},
+  "objections": {{
+    "primary_objection": "",
+    "secondary_objections": [],
+    "objection_quotes": [
+      {{
+        "quote": "",
+        "speaker": "",
+        "time_start": 0.0,
+        "time_end": 0.0,
+        "objection_type": "platform | product_fit | fees | performance | complexity | timing | other",
+        "explanation": ""
+      }}
+    ]
+  }},
+  "intent": {{
+    "intent_label": "strong_interest | mild_interest | neutral | polite_decline | firm_decline | information_only",
+    "rationale": "",
+    "next_step_requested_by_prospect": "followup_call | email_only | no_followup | not_specified",
+    "next_step_quotes": [
+      {{
+        "quote": "",
+        "speaker": "",
+        "time_start": 0.0,
+        "time_end": 0.0
+      }}
+    ]
+  }},
+  "call_outcome": {{
+    "outcome_label": "meeting_booked | followup_promised | email_only | no_next_step | gatekeeper_block | other",
+    "agent_commitments": [],
+    "prospect_commitments": []
+  }},
+  "sentiment_emotion": {{
+    "prospect": {{
+      "overall": "positive | neutral | negative | mixed",
+      "description": ""
+    }},
+    "agent": {{
+      "overall": "positive | neutral | negative | mixed",
+      "description": ""
+    }}
+  }},
+  "engagement": {{
+    "overall_engagement_level": "high | medium | low",
+    "talk_ratio": {{
+      "agent_percentage": 0.0,
+      "prospect_percentage": 0.0
+    }},
+    "engagement_timeline": [
+      {{
+        "time_start": 0.0,
+        "time_end": 0.0,
+        "level": "high | medium | low",
+        "main_speaker": "",
+        "description": ""
+      }}
+    ]
+  }},
+  "notes_for_crm": [
+    ""
+  ]
+}}

@@ -1,0 +1,66 @@
+{
+  "input_file": "/mnt/Data_Temp/sec13f/staging/",
+  "loaded_at": "2025-11-26T16:15:04.256207",
+  "files_loaded": 350,
+  "total_rows_loaded": 111333783,
+  "zips_imported": 50,
+  "total_time_seconds": 4966.926904439926,
+  "load_results": [
+    {
+      "table_type": "submission",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 364278,
+      "errors": [],
+      "time_seconds": 10.796059131622314
+    },
+    {
+      "table_type": "coverpage",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 364278,
+      "errors": [],
+      "time_seconds": 8.992886066436768
+    },
+    {
+      "table_type": "signature",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 364278,
+      "errors": [],
+      "time_seconds": 9.109918594360352
+    },
+    {
+      "table_type": "summarypage",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 288053,
+      "errors": [],
+      "time_seconds": 7.259073495864868
+    },
+    {
+      "table_type": "othermanager",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 187300,
+      "errors": [],
+      "time_seconds": 7.429630994796753
+    },
+    {
+      "table_type": "othermanager2",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 146587,
+      "errors": [],
+      "time_seconds": 6.881364583969116
+    },
+    {
+      "table_type": "infotable",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 109619009,
+      "errors": [],
+      "time_seconds": 4899.606046199799
+    }
+  ]
+}

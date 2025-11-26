@@ -1,0 +1,14 @@
+{{
+  "title": "",
+  "summary": "",
+  "main_topics": [],
+  "key_facts": [],
+  "entities": {{
+    "people": [],
+    "organizations": [],
+    "locations": [],
+    "dates": []
+  }},
+  "links": [],
+  "full_clean_text": ""
+}}
