@@ -1,449 +1,290 @@
-# crawl_sec13f
+# SEC 13F ETL Pipeline
 
-This folder contains the code to **download, parse, and load SEC Form 13F data sets** into our **MariaDB `sec13f` database**.
+A modular Python pipeline to **crawl, download, extract, parse, and load SEC Form 13F data** into MariaDB.
 
-The goal is to build a repeatable ETL pipeline that:
+## Overview
 
-1. Crawls the **Form 13F Data Sets** page on SEC.
-2. Downloads all quarterly **ZIP** files.
-3. Extracts the tab-delimited text files inside each ZIP.
-4. Normalizes and loads them into MariaDB using the **`sec13f` schema**.
-5. Supports **incremental updates** (only process new ZIPs).
+**4-Step ETL Pipeline:**
 
-Cursor should treat this as a standalone Python subproject that plugs into our existing crawler framework.
+1. **step1_batch_extract_link.py** - Crawl web pages and extract download links (reusable)
+2. **step2_download_extract.py** - Download and extract archives (reusable, supports .zip/.tar.gz)
+3. **step3_sec13f_parse_normalize.py** - Parse and normalize SEC 13F data (specific to 13F)
+4. **step4_sec13f_load_db.py** - Load normalized data into MariaDB (specific to 13F)
 
----
-
-## 1. Data sources
-
-### 1.1 Documentation / schema
-
-- **13F readme / schema:**  
-  - `https://www.sec.gov/files/form_13f_readme.pdf`  
-  - Describes:
-    - Tables (`submission`, `coverpage`, `othermanager`, `othermanager2`, `signature`, `summarypage`, `infotable`)
-    - Columns, data types, and primary keys
-    - File naming conventions and formats
-
-If needed, we can store a local copy here as:  
-`docs/form_13f_readme.pdf`
-
-### 1.2 Data sets (quarterly ZIPs)
-
-- **Index page:**  
-  - `https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets`
-- This page links to many ZIP files:
-  - `.../2025-june-july-august-form13f.zip`
-  - `.../2025-march-april-may-form13f.zip`
-  - …
-  - Back to 2013 Q2
-
-Each ZIP contains **multiple tab-delimited (`.txt`) files**, one per table (names may vary slightly but typically include `submission`, `coverpage`, `summarypage`, `othermanager`, `othermanager2`, `signature`, `infotable`).
+**Key Features:**
+- ✅ **Modular**: Each step is independent and can be run separately
+- ✅ **Reusable**: Steps 1 & 2 work with any web source (not just SEC 13F)
+- ✅ **JSON-based**: Each step outputs JSON for workflow automation (e.g., n8n)
+- ✅ **Configurable**: Batch processing via JSON config files
 
 ---
 
-## 2. Target database
+## Quick Start
 
-We use **MariaDB** running on a dedicated Linux container.
+```bash
+# Step 1: Crawl SEC page and discover ZIP files
+python step1_batch_extract_link.py \\
+  --config config/batch_sec13f.json \\
+  --output config/results_sec13f.json
 
-- Database: `sec13f`
-- Engine: `InnoDB` for all tables
-- Charset: `utf8mb4`
+# Step 2: Download ZIPs and extract .tsv/.txt files
+python step2_download_extract.py \\
+  --input config/results_sec13f.json \\
+  --file-extensions ".tsv,.txt" \\
+  --exclude-patterns "readme,metadata" \\
+  --output config/extracted_files_sec13f.json
 
-The tables are pre-created (or will be) using this schema.
+# Step 3: Parse and normalize data
+python step3_sec13f_parse_normalize.py \\
+  --input config/extracted_files_sec13f.json \\
+  --output config/normalized_files_sec13f.json
 
-### 2.1 `submission`
+# Step 4: Load into MariaDB
+python step4_sec13f_load_db.py \\
+  --staging-dir /mnt/Data_Temp/sec13f/staging/
+```
 
-One row per EDGAR submission (filing).
+---
 
-```sql
-CREATE TABLE submission (
-  ACCESSION_NUMBER           VARCHAR(20) NOT NULL,
-  CIK                        BIGINT,
-  FILER_NAME                 VARCHAR(255),
-  SUBMISSIONTYPE             VARCHAR(20),
-  REPORTCALENDARORQUARTER    DATE,
-  PERIODOFREPORT             DATE,
-  FILING_DATE                DATE,
-  FILED_AS_OF_DATE           DATE,
-  EFFECTIVE_DATE             DATE,
-  PRIMARY KEY (ACCESSION_NUMBER),
-  INDEX idx_sub_cik_period (CIK, PERIODOFREPORT)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-Primary key: ACCESSION_NUMBER
+## Project Structure
 
-2.2 coverpage
-1:1 with submission.
-
-sql
-Copy code
-CREATE TABLE coverpage (
-  ACCESSION_NUMBER     VARCHAR(20) NOT NULL,
-  NAME                 VARCHAR(255),
-  STREET1              VARCHAR(255),
-  STREET2              VARCHAR(255),
-  CITY                 VARCHAR(100),
-  STATEORCOUNTRY       VARCHAR(50),
-  ZIPCODE              VARCHAR(20),
-  PHONE                VARCHAR(50),
-  TYPEOFREPORT         VARCHAR(100),
-  FORM13F_FILE_NUMBER  VARCHAR(50),
-  PRIMARY KEY (ACCESSION_NUMBER),
-  CONSTRAINT fk_cover_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-2.3 signature
-1:1 with submission.
-
-sql
-Copy code
-CREATE TABLE signature (
-  ACCESSION_NUMBER   VARCHAR(20) NOT NULL,
-  NAME               VARCHAR(255),
-  TITLE              VARCHAR(255),
-  PHONE              VARCHAR(50),
-  CITY               VARCHAR(100),
-  STATEORCOUNTRY     VARCHAR(50),
-  SIGNATUREDATE      DATE,
-  PRIMARY KEY (ACCESSION_NUMBER),
-  CONSTRAINT fk_sig_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-2.4 summarypage
-1:1 with submission.
-
-sql
-Copy code
-CREATE TABLE summarypage (
-  ACCESSION_NUMBER         VARCHAR(20) NOT NULL,
-  OTHER_INCLUDED_MANAGERS  INT,
-  TABLE_ENTRY_TOTAL        INT,
-  TABLE_VALUE_TOTAL        BIGINT,
-  PRIMARY KEY (ACCESSION_NUMBER),
-  CONSTRAINT fk_sum_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-2.5 othermanager
-0..N per submission.
-
-sql
-Copy code
-CREATE TABLE othermanager (
-  ACCESSION_NUMBER   VARCHAR(20) NOT NULL,
-  OTHERMANAGER_SK    INT NOT NULL,
-  SEQUENCENUMBER     INT,
-  NAME               VARCHAR(255),
-  CIK                BIGINT,
-  PRIMARY KEY (ACCESSION_NUMBER, OTHERMANAGER_SK),
-  INDEX idx_om_cik (CIK),
-  CONSTRAINT fk_om_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-2.6 othermanager2
-0..N per submission.
-
-sql
-Copy code
-CREATE TABLE othermanager2 (
-  ACCESSION_NUMBER   VARCHAR(20) NOT NULL,
-  SEQUENCENUMBER     INT NOT NULL,
-  CIK                BIGINT,
-  NAME               VARCHAR(255),
-  PRIMARY KEY (ACCESSION_NUMBER, SEQUENCENUMBER),
-  INDEX idx_om2_cik (CIK),
-  CONSTRAINT fk_om2_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-2.7 infotable (holdings)
-The largest table; one row per security holding in a filing.
-
-sql
-Copy code
-CREATE TABLE infotable (
-  ACCESSION_NUMBER      VARCHAR(20) NOT NULL,
-  INFOTABLE_SK          INT NOT NULL,
-
-  NAMEOFISSUER          VARCHAR(255),
-  TITLEOFCLASS          VARCHAR(100),
-  CUSIP                 VARCHAR(20),
-  VALUE                 BIGINT,
-  SSHPRNAMT             BIGINT,
-  SSHPRNAMTTYPE         VARCHAR(4),
-  PUTCALL               VARCHAR(10),
-  INVESTMENTDISCRETION  VARCHAR(50),
-  OTHERMANAGERS         VARCHAR(255),
-  VOTINGAUTH_SOLE       BIGINT,
-  VOTINGAUTH_SHARED     BIGINT,
-  VOTINGAUTH_NONE       BIGINT,
-
-  PRIMARY KEY (ACCESSION_NUMBER, INFOTABLE_SK),
-
-  INDEX idx_info_cusip (CUSIP),
-  INDEX idx_info_issuer (NAMEOFISSUER),
-  INDEX idx_info_accession (ACCESSION_NUMBER),
-
-  CONSTRAINT fk_info_sub
-    FOREIGN KEY (ACCESSION_NUMBER)
-    REFERENCES submission(ACCESSION_NUMBER)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-3. Project structure (desired)
-The crawl_sec13f folder should be organized roughly like:
-
-text
-Copy code
+```
 crawl_sec13f/
-  README.md            <- this file
-  config.py            <- SEC URLs, DB connection, paths
-  main.py              <- entry point (crawl + load)
-  sec_index.py         <- code to fetch & parse ZIP links from SEC
-  downloader.py        <- download ZIPs
-  extractor.py         <- unzip + enumerate .txt files
-  loader/
+  # Core Scripts
+  step1_batch_extract_link.py       <- Step 1: Web crawling
+  step2_download_extract.py         <- Step 2: Download & extract
+  step3_sec13f_parse_normalize.py   <- Step 3: Parse & normalize
+  step4_sec13f_load_db.py           <- Step 4: Load to database
+  
+  # Reusable Web Crawler Module
+  web_crawler/
     __init__.py
-    submission_loader.py
-    coverpage_loader.py
-    infotable_loader.py
-    ...                <- one module per table
+    extract_download_link.py        <- Selenium automation + click strategies
+  
+  # Database Module
   db/
-    connection.py      <- MariaDB connection (pymysql or mysqlclient)
-    schema_notes.md    <- optional extra docs
-  data/
-    zips/              <- downloaded ZIP files
-    staging/           <- temporary normalized tab files for LOAD DATA
-  docs/
-    form_13f_readme.pdf (optional local copy)
-Cursor can reorganize as appropriate, but the above expresses intent.
-
-4. Environment / configuration
-Use environment variables (or .env) to keep secrets out of code:
-
-SEC13F_DB_HOST – MariaDB host (localhost in the container)
-
-SEC13F_DB_PORT – MariaDB port (3306)
-
-SEC13F_DB_USER – DB user (e.g. secuser)
-
-SEC13F_DB_PASSWORD – DB password
-
-SEC13F_DB_NAME – Database name (sec13f)
-
-SEC13F_DATA_DIR – base directory for ZIPs and staging (e.g. /data/sec13f)
-
-SEC13F_USER_AGENT – custom User-Agent string required by SEC, e.g.:
-"HybridFinancial 13F Loader (contact@example.com)"
-
-SEC13F_LINK - Link to crawl
-
-5. Required behavior / steps
-5.1 Crawl SEC index and discover ZIP files
-Fetch https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets.
-
-Parse HTML to find <a> tags whose href ends with .zip.
-
-Normalize relative URLs (prefix with https://www.sec.gov).
-
-Deduplicate and sort the ZIP URLs.
-
-Optionally maintain a local record (e.g. in DB or a JSON file) of which ZIPs have already been processed.
-
-5.2 Download ZIP files
-For each discovered ZIP URL:
-
-Check if the target file already exists in data/zips/. If yes, skip download (idempotent).
-
-Download streaming to disk.
-
-Use the configured SEC13F_USER_AGENT header to be nice to SEC’s servers.
-
-5.3 Extract & classify text files
-Inside each ZIP:
-
-List files, pick only *.txt (tab-delimited).
-
-Identify which table each file corresponds to by name pattern:
-
-e.g. if "submission" in filename → submission
-
-"cover" or "coverpage" → coverpage
-
-"summary" → summarypage
-
-"othermanager2" → othermanager2
-
-"othermanager" → othermanager (but not ...2)
-
-"signature" → signature
-
-"infotable" → infotable
-
-For each recognized file:
-
-Feed it to the corresponding loader.
-
-5.4 Parsing / normalization
-Each .txt file is a tab-delimited text file with a header row.
-
-Requirements:
-
-Read using UTF-8, delimiter="\t".
-
-Strip whitespace from field values.
-
-Convert:
-
-Empty strings → None (or \N for LOAD DATA)
-
-Date strings DD-MON-YYYY → YYYY-MM-DD
-
-Numeric fields → int / BIGINT compatible values.
-
-Example date parsing:
-
-Input: "31-DEC-2024"
-
-Output: "2024-12-31"
-
-We can implement normalization either:
-
-In Python and then write a cleaned tab file for LOAD DATA, or
-
-Use Python value transforms while preparing bulk inserts.
-
-5.5 Loading into MariaDB
-Preferred method: LOAD DATA LOCAL INFILE for speed.
-
-Per table, the loader should:
-
-Create a temporary normalized .tsv file in data/staging/ with:
-
-no header line
-
-\t as separator
-
-\n line endings
-
-\N for NULLs
-
-Execute LOAD DATA LOCAL INFILE with explicit column list.
-
-Example (Python concept):
-
-sql
-Copy code
-LOAD DATA LOCAL INFILE '/data/sec13f/staging/submission_2025Q2.tsv'
-INTO TABLE submission
-FIELDS TERMINATED BY '\t'
-LINES TERMINATED BY '\n'
-(ACCESSION_NUMBER, CIK, FILER_NAME, SUBMISSIONTYPE,
- REPORTCALENDARORQUARTER, PERIODOFREPORT,
- FILING_DATE, FILED_AS_OF_DATE, EFFECTIVE_DATE);
-The loader should be idempotent:
-
-If the same ZIP is re-processed, submission rows with the same ACCESSION_NUMBER should not be duplicated.
-
-Strategy:
-
-Use INSERT IGNORE or ON DUPLICATE KEY UPDATE if inserting row-by-row, or
-
-Load into a temporary table and upsert.
-
-For simplicity in phase 1, we can:
-
-Truncate related tables before reloading a specific ZIP
-OR
-
-Keep a separate "imported_zip_files" tracking table to never re-import the same ZIP twice.
-
-5.6 Incremental updates
-The pipeline should support:
-
-Initial full load:
-
-Process all discovered ZIPs.
-
-Subsequent runs:
-
-Re-scan the index page.
-
-Only download and process new ZIPs that:
-
-Are not in data/zips/, or
-
-Are not marked as processed in tracking table.
-
-We can add a table:
-
-sql
-Copy code
+    __init__.py
+    connection.py                   <- MariaDB connection helper
+  
+  # Configuration
+  config.py                         <- Settings (DB, paths, URLs)
+  config/
+    batch_sec13f.json               <- Batch config for SEC 13F
+    results_sec13f.json             <- Step 1 output
+    extracted_files_sec13f.json     <- Step 2 output
+    normalized_files_sec13f.json    <- Step 3 output
+  
+  # Data Storage (runtime)
+  data/ or /mnt/Data/App/HybridFinancial/sec13f/
+    zips/                           <- Downloaded archives
+    extracted/                      <- Extracted raw files
+    staging/                        <- Normalized TSV for LOAD DATA
+  
+  # Documentation
+  README.md                         <- This file
+  USAGE.md                          <- Detailed usage guide
+  docs/                             <- Additional documentation
+```
+
+---
+
+## Data Source
+
+**SEC Form 13F Data Sets:**
+- URL: https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets
+- Format: Quarterly ZIP files (2013 Q2 - present)
+- Contains: Tab-delimited files for multiple tables
+
+---
+
+## Database Schema
+
+**Target:** MariaDB database `sec13f` with 7 tables:
+
+### Core Tables
+
+**submission** (filing metadata)
+- Primary key: `ACCESSION_NUMBER`
+- Fields: CIK, filer name, report date, filing date, etc.
+
+**coverpage** (filer information)
+- 1:1 with submission
+- Fields: Name, address, phone, report type, etc.
+
+**signature** (signatory information)
+- 1:1 with submission
+- Fields: Name, title, signature date, etc.
+
+**summarypage** (filing summary)
+- 1:1 with submission
+- Fields: Total entries, total value, etc.
+
+**othermanager** / **othermanager2** (other managers)
+- 0..N per submission
+- Fields: Name, CIK, sequence number
+
+**infotable** (holdings - largest table)
+- 0..N per submission
+- Fields: Security name, CUSIP, value, shares, voting authority, etc.
+
+See [create_13f_tables.sql](config/create_13f_tables.sql) for complete schema.
+
+---
+
+## Environment Variables
+
+Configure via `.env` file or environment:
+
+```bash
+# Database
+SEC13F_DB_HOST=hybrid-admin-mysql.mysql.database.azure.com
+SEC13F_DB_PORT=3306
+SEC13F_DB_USER=YourUser
+SEC13F_DB_PASSWORD=YourPassword
+SEC13F_DB_NAME=sec13f_db
+
+# Paths
+SEC13F_DATA_DIR=/mnt/Data/App/HybridFinancial/sec13f
+
+# SEC Compliance
+SEC13F_USER_AGENT="HybridFinancial 13F Loader (contact@example.com)"
+```
+
+---
+
+## Pipeline Details
+
+### Step 1: Web Crawling (Reusable)
+
+**Module:** `web_crawler.extract_download_link`
+
+**Features:**
+- Selenium automation for JavaScript-rendered pages
+- Multiple click strategies (text, class, css, xpath, id)
+- Universal file type detection
+- Batch processing support
+
+**Example Config:**
+```json
+{
+  "pages": [
+    {
+      "name": "SEC Market Data 13f Data Sets",
+      "url": "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
+      "file_type": ".zip",
+      "click_strategies": []
+    }
+  ]
+}
+```
+
+---
+
+### Step 2: Download & Extract (Reusable)
+
+**Features:**
+- Multi-format support: .zip, .tar.gz, .tar, .tgz
+- File filtering: `--file-extensions`, `--exclude-patterns`
+- Structure options: flat (default) or subdirectories (`--create-sub-dir`)
+- Idempotent: Skips already-downloaded files
+
+**Output naming:**
+- Flat: `2023q4_form13f__COVERPAGE.tsv`
+- Sub-dir: `2023q4_form13f/COVERPAGE.tsv`
+
+---
+
+### Step 3: Parse & Normalize (SEC 13F Specific)
+
+**Features:**
+- Tab-delimited parsing
+- Data normalization:
+  - Dates: `31-DEC-2024` → `2024-12-31`
+  - Nulls: Empty strings → `\N`
+  - Types: int, bigint, varchar
+- Table identification by filename pattern
+- Output: Clean TSV files for LOAD DATA
+
+---
+
+### Step 4: Load into Database (SEC 13F Specific)
+
+**Features:**
+- Bulk loading via `LOAD DATA LOCAL INFILE`
+- Idempotent: `ON DUPLICATE KEY UPDATE`
+- Transaction support with rollback
+- Foreign key ordering (submission → coverpage → infotable, etc.)
+- Import tracking to prevent duplicates
+
+**Tracking table:**
+```sql
 CREATE TABLE imported_zip_files (
-  zip_name      VARCHAR(255) PRIMARY KEY,
-  imported_at   DATETIME NOT NULL
+  zip_name VARCHAR(255) PRIMARY KEY,
+  imported_at DATETIME NOT NULL
 ) ENGINE=InnoDB;
-Each time we successfully finish loading a ZIP, we insert a row here.
+```
 
-6. Implementation notes for Cursor
-Language: Python 3
+---
 
-Likely dependencies:
+## Technology Stack
 
-requests – HTTP client
+- **Language:** Python 3.10+
+- **Web Automation:** Selenium + ChromeDriver
+- **Database:** MariaDB (InnoDB)
+- **Dependencies:**
+  - `selenium` - browser automation
+  - `webdriver-manager` - automatic ChromeDriver
+  - `requests` - HTTP client
+  - `pymysql` - MariaDB connector
+  - `python-dotenv` - environment variables
 
-beautifulsoup4 – HTML parsing
+---
 
-pymysql or mysqlclient – MariaDB connector
+## Reusability
 
-python-dotenv – (optional) for .env file
+**Steps 1 & 2 are universal:**
+- ✅ Works with any website
+- ✅ Any file type (.pdf, .mp3, .txt, etc.)
+- ✅ Any archive format
+- ✅ Batch processing ready
 
-The code should be structured to:
+**Use cases beyond SEC 13F:**
+- IAPD (Investment Adviser Public Disclosure)
+- Other SEC filings (13D, 13G, Form 4, etc.)
+- Any web scraping + file extraction task
 
-Allow a top-level main.py to run the full ETL end-to-end.
+**Steps 3 & 4 are SEC 13F-specific:**
+- Template for other SEC filing parsers
+- Can be adapted for similar structured data
 
-Re-use our existing crawler framework where possible (e.g., request helpers, logging).
+---
 
-SEC politeness
-Always set a meaningful User-Agent.
+## Future Enhancements
 
-Consider adding small sleeps or basic rate limiting if needed.
+### Planned:
+- [ ] Add support for other SEC forms (13D, 13G, Form 4)
+- [ ] Incremental updates (delta detection)
+- [ ] Data quality checks and validation
+- [ ] n8n workflow examples
+- [ ] Monitoring and alerting
+- [ ] Docker containerization
 
-Handle transient errors (HTTP 5xx) with retries.
+### Already Flexible:
+- ✅ Universal file type support
+- ✅ Multiple archive formats
+- ✅ Batch configuration
+- ✅ Modular architecture
 
-7. Example usage
-Once implemented:
+---
 
-bash
-Copy code
-# (Optional) activate virtualenv
-cd crawl_sec13f
+## Documentation
 
-# .env contains DB + SEC config
-python main.py
-main.py should:
+- [USAGE.md](USAGE.md) - Detailed usage guide with examples
+- [docs/](docs/) - Additional documentation and notes
+- [config/create_13f_tables.sql](config/create_13f_tables.sql) - Database schema
 
-Read config.
+---
 
-Fetch and parse ZIP links.
+## License
 
-Download any missing ZIPs.
-
-For each new ZIP:
-
-Extract .txt files.
-
-Run loaders for each table.
-
-Mark ZIP as imported.
-
-Afterwards, the sec13f database will be populated and ready for analytics / downstream tasks.
-
-::contentReference[oaicite:0]{index=0}
+Internal use only - HybridFinancial

@@ -1,0 +1,20 @@
+{
+  "extracted_at": "2025-11-27T15:20:21.602402",
+  "total_pages": 1,
+  "total_files": 50,
+  "results": [
+    {
+      "name": "SEC Market Data 13f Data Sets",
+      "url": "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
+      "status": "success",
+      "file_type": ".zip",
+      "file_count": 50,
+      "file_urls": [
+        "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01dec2024-28feb2025_form13f.zip",
+        "https://www.sec.gov/files/structureddata/data/form-13f-data-sets/01jan2024-29feb2024_form13f.zip"
+      ],
+      "save_path": "sec13f_2025.html",
+      "timestamp": "2025-11-27T15:20:21.602221"
+    }
+  ]
+}

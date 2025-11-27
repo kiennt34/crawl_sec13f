@@ -1,0 +1,18 @@
+{
+  "input_file": "/mnt/Data_Temp/sec13f/staging",
+  "loaded_at": "2025-11-26T21:31:17.786110",
+  "files_loaded": 50,
+  "total_rows_loaded": 146587,
+  "zips_imported": 50,
+  "total_time_seconds": 12.587250232696533,
+  "load_results": [
+    {
+      "table_type": "othermanager2",
+      "files_processed": 50,
+      "files_total": 50,
+      "rows_loaded": 146587,
+      "errors": [],
+      "time_seconds": 7.1379170417785645
+    }
+  ]
+}

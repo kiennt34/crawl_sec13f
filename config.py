@@ -26,7 +26,7 @@ class Config:
     EXTRACTED_DIR: Path = BASE_DATA_DIR / "extracted"
     
     # SEC configuration
-    SEC_INDEX_URL: str = os.getenv(
+    CRAWL_URL: str = os.getenv(
         "SEC13F_LINK",
         "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets"
     )
@@ -35,7 +35,7 @@ class Config:
         "HybridFinancial 13F Loader (contact@example.com)"
     )
     # Print information
-    print(f"SEC_INDEX_URL: {SEC_INDEX_URL}")
+    print(f"SEC_INDEX_URL: {CRAWL_URL}")
     print(f"USER_AGENT: {USER_AGENT}")
     print(f"DB_HOST: {DB_HOST}")
     print(f"DB_PORT: {DB_PORT}")

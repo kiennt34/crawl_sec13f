@@ -1,0 +1,13 @@
+{
+    "description": "Batch configuration for extracting ZIP files from multiple pages",
+    "pages": [
+        {
+            "name": "SEC Market Data 13f Data Sets",
+            "url": "https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets",
+            "wait_time": 20,
+            "headless": true,
+            "save_path": "sec13f_2025.html",
+            "file_type": ".zip"
+        }
+    ]
+}

@@ -1,1 +1,1 @@
-python3 ./step4_load_db_new.py --staging-dir /mnt/Data_Temp/sec13f/staging/ --show-imported
+python3 ./step4_sec13f_load_db.py --staging-dir /mnt/Data_Temp/sec13f/staging/ --show-imported

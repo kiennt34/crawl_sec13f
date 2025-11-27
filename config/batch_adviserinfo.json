@@ -1,0 +1,39 @@
+{
+    "description": "Batch configuration for extracting ZIP files from multiple pages",
+    "pages": [
+        {
+            "name": "IAPD Form ADV Data Files",
+            "url": "https://adviserinfo.sec.gov/adv",
+            "wait_time": 20,
+            "headless": true,
+            "save_path": "adv_2025.html",
+            "file_type": ".zip",
+            "click_strategies": [
+                {
+                    "type": "text",
+                    "value": "Form ADV Part 1 Data Files",
+                    "description": "Try clicking by text content",
+                    "click_all": false
+                },
+                {
+                    "type": "text",
+                    "value": "Form ADV Part 2 Data Files",
+                    "description": "Try clicking by text content",
+                    "click_all": false
+                },
+                {
+                    "type": "text",
+                    "value": "Form ADV Part 3 Data Files",
+                    "description": "Try clicking by text content",
+                    "click_all": false
+                },
+                {
+                    "type": "text",
+                    "value": "Form ADV-W Data Files",
+                    "description": "Try clicking by text content for Form ADV-W",
+                    "click_all": false
+                }
+            ]
+        }
+    ]
+}
